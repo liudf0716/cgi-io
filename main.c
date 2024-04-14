@@ -546,9 +546,11 @@ main_download(int argc, char **argv)
 	if (!S_ISREG(s.st_mode) && !S_ISBLK(s.st_mode))
 		return failure(403, 0, "Requested path is not a regular file or block device");
 
+#if 0
 	for (p = fields[5]; p && *p; p++)
 		if (!isalnum(*p) && !strchr(" ()<>@,;:[]?.=%-", *p))
 			return failure(400, 0, "Invalid characters in filename");
+#endif
 
 	for (p = fields[7]; p && *p; p++)
 		if (!isalnum(*p) && !strchr(" .;=/-", *p))
