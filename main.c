@@ -537,10 +537,19 @@ main_download(int argc, char **argv)
 	if (!fields[1] || !session_access(fields[1], "cgi-io", "download", "read"))
 		return failure(403, 0, "Download permission denied");
 
-	if (!fields[3] || !session_access(fields[1], "file", fields[3], "read"))
+	/*
+	 * Canonicalize the requested path before checking it against the session
+	 * ACL and opening it. The rpcd ACL matcher uses fnmatch() without
+	 * FNM_PATHNAME, so a "../" suffix would otherwise match an allowed glob
+	 * prefix during the ACL check while open() resolves the embedded ".."
+	 * and reaches a file outside of that prefix.
+	 */
+	autochar *path = fields[3] ? canonicalize_path(fields[3], strlen(fields[3])) : NULL;
+
+	if (!path || !session_access(fields[1], "file", path, "read"))
 		return failure(403, 0, "Access to path denied by ACL");
 
-	if (stat(fields[3], &s))
+	if (stat(path, &s))
 		return failure(404, errno, "Failed to stat requested path");
 
 	if (!S_ISREG(s.st_mode) && !S_ISBLK(s.st_mode))
@@ -554,7 +563,7 @@ main_download(int argc, char **argv)
 		if (!isalnum(*p) && !strchr(" .;=/-", *p))
 			return failure(400, 0, "Invalid characters in mimetype");
 
-	rfd = open(fields[3], O_RDONLY);
+	rfd = open(path, O_RDONLY);
 
 	if (rfd < 0)
 		return failure(500, errno, "Failed to open requested path");
