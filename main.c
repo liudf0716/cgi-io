@@ -743,8 +743,10 @@ main_exec(int argc, char **argv)
 	int i, devnull, status, fds[2];
 	bool allowed = false, redir_stderr = false;
 	ssize_t len = 0;
+	size_t exelen;
 	const char *exe;
 	char *p, **args;
+	autochar *canon = NULL;
 	pid_t pid;
 
 	autochar *post = postdecode(fields, 5);
@@ -770,15 +772,44 @@ main_exec(int argc, char **argv)
 	if (!args)
 		return failure(400, 0, "Invalid command parameter");
 
+	/*
+	 * Canonicalize the executable path before checking it against the
+	 * session ACL and executing it. As the rpcd ACL matcher uses fnmatch()
+	 * without FNM_PATHNAME, a "../" sequence in the leading token would
+	 * otherwise let an allowed glob prefix match while execv() resolves to a
+	 * binary outside of that prefix. The leading token is everything up to
+	 * the first argument separator.
+	 */
+	exelen = args[1] ? (size_t)(args[1] - args[0] - 1) : strlen(args[0]);
+	canon = canonicalize_path(args[0], exelen);
+
+	if (!canon) {
+		free(args);
+		return failure(400, 0, "Invalid command parameter");
+	}
+
 	/* First check if we find an ACL match for the whole cmdline ... */
-	allowed = session_access(fields[1], "file", args[0], "exec");
+	{
+		char *tail = args[0] + exelen;
+		autochar *cmdline = malloc(strlen(canon) + strlen(tail) + 1);
+
+		if (!cmdline) {
+			free(args);
+			return failure(500, errno, "Out of memory");
+		}
+
+		strcpy(cmdline, canon);
+		strcat(cmdline, tail);
+
+		allowed = session_access(fields[1], "file", cmdline, "exec");
+	}
 
 	/* Now split the command vector... */
 	for (i = 1; args[i]; i++)
 		args[i][-1] = 0;
 
 	/* Find executable... */
-	exe = lookup_executable(args[0]);
+	exe = lookup_executable(canon);
 
 	if (!exe) {
 		free(args);
