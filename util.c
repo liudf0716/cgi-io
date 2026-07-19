@@ -118,6 +118,14 @@ postdecode_fields(char *postbuf, ssize_t len, char **fields, int n_fields)
 	{
 		if (!urldecode(fields[field + 1]))
 		{
+			/*
+			 * Clear all value pointers before releasing the shared
+			 * buffer so that a caller which ignores the NULL return
+			 * cannot dereference a dangling pointer into freed memory.
+			 */
+			for (i = 0; i < n_fields; i++)
+				fields[(i * 2) + 1] = NULL;
+
 			free(postbuf);
 			return NULL;
 		}

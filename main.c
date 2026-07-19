@@ -532,7 +532,9 @@ main_download(int argc, char **argv)
 	int rfd;
 
 	autochar *post = postdecode(fields, 4);
-	(void) post;
+
+	if (!post)
+		return failure(400, 0, "Invalid form data");
 
 	if (!fields[1] || !session_access(fields[1], "cgi-io", "download", "read"))
 		return failure(403, 0, "Download permission denied");
@@ -633,7 +635,9 @@ main_backup(int argc, char **argv)
 	char *fields[] = { "sessionid", NULL };
 
 	autochar *post = postdecode(fields, 1);
-	(void) post;
+
+	if (!post)
+		return failure(400, 0, "Invalid form data");
 
 	if (!fields[1] || !session_access(fields[1], "cgi-io", "backup", "read"))
 		return failure(403, 0, "Backup permission denied");
@@ -750,7 +754,9 @@ main_exec(int argc, char **argv)
 	pid_t pid;
 
 	autochar *post = postdecode(fields, 5);
-	(void) post;
+
+	if (!post)
+		return failure(400, 0, "Invalid form data");
 
 	if (!fields[1] || !session_access(fields[1], "cgi-io", "exec", "read"))
 		return failure(403, 0, "Exec permission denied");
